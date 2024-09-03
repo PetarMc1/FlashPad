@@ -1,14 +1,18 @@
 import tkinter as tk
 import tkinter.font as tkfont
 from tkinter import filedialog, messagebox
+from PIL import Image, ImageTk
+import requests
+from io import BytesIO
 
 class Flashpad(tk.Tk):
     def __init__(self):
         super().__init__()
 
-        self.title("Flashpad")
+        self.title("FlashpPad")
         self.geometry("800x600")
-        self.iconbitmap('./icon.ico')
+
+        self.load_icon_from_url('https://cdn.458011.xyz/flashpad/icon.ico')
 
         self.current_font_size = 12
         self.current_font = tkfont.Font(family="Consolas", size=self.current_font_size)
@@ -54,21 +58,32 @@ class Flashpad(tk.Tk):
         self.text_widget.bind("<KeyRelease>", self.on_text_change)
         self.text_widget.bind("<ButtonRelease-1>", self.on_text_change)
 
-        self.bind_all("<Control-s>", self.save_file)
-        self.bind_all("<Control-o>", self.open_file)
-        self.bind_all("<Control-n>", self.new_file)
-        self.bind_all("<Control-p>", self.print_file)
-        self.bind_all("<Control-equal>", self.increase_font_size)
-        self.bind_all("<Control-minus>", self.decrease_font_size)
-        self.bind_all("<Control-0>", self.reset_font_size)
+        self.bind_all("<Control-s>", self.save_file)  # Ctrl + S
+        self.bind_all("<Control-o>", self.open_file)  # Ctrl + O
+        self.bind_all("<Control-n>", self.new_file)  # Ctrl + N
+        self.bind_all("<Control-p>", self.print_file)  # Ctrl + P
+        self.bind_all("<Control-equal>", self.increase_font_size)  # Ctrl + =
+        self.bind_all("<Control-minus>", self.decrease_font_size)  # Ctrl + -
+        self.bind_all("<Control-0>", self.reset_font_size)  # Ctrl + 0 (reset to default)
 
         self.finalize_setup()
 
+    def load_icon_from_url(self, url):
+        try:
+            response = requests.get(url)
+            response.raise_for_status()
+            image = Image.open(BytesIO(response.content))
+            self.iconphoto(True, ImageTk.PhotoImage(image))
+        except requests.RequestException as e:
+            print(f"Error loading icon from URL: {e}")
+        except IOError as e:
+            print(f"Error processing icon image: {e}")
+
     def create_menu_bar(self):
-        self.menu_bar = tk.Menu(self, bg='#f0f0f0', fg='black', bd=0)
+        self.menu_bar = tk.Menu(self, bg='#f0f0f0', fg='black', bd=0)  # Light theme for menu bar
         self.configure(menu=self.menu_bar)
 
-        self.file_menu = tk.Menu(self.menu_bar, tearoff=0, bg='#f0f0f0', fg='black', bd=0)
+        self.file_menu = tk.Menu(self.menu_bar, tearoff=0, bg='#f0f0f0', fg='black', bd=0)  # Light theme for File menu
         self.file_menu.add_command(label="New", command=self.new_file, accelerator="Ctrl + N")
         self.file_menu.add_command(label="Open", command=self.open_file, accelerator="Ctrl + O")
         self.file_menu.add_command(label="Save", command=self.save_file, accelerator="Ctrl + S")
@@ -78,7 +93,7 @@ class Flashpad(tk.Tk):
         self.file_menu.add_command(label="Exit", command=self.quit)
         self.menu_bar.add_cascade(label="File", menu=self.file_menu)
 
-        self.edit_menu = tk.Menu(self.menu_bar, tearoff=0, bg='#f0f0f0', fg='black', bd=0)
+        self.edit_menu = tk.Menu(self.menu_bar, tearoff=0, bg='#f0f0f0', fg='black', bd=0)  # Light theme for Edit menu
         self.edit_menu.add_command(label="Undo", command=self.undo, accelerator="Ctrl + Z")
         self.edit_menu.add_command(label="Redo", command=self.redo, accelerator="Ctrl + Y")
         self.edit_menu.add_separator()
@@ -87,7 +102,7 @@ class Flashpad(tk.Tk):
         self.edit_menu.add_command(label="Paste", command=self.paste, accelerator="Ctrl + V")
         self.menu_bar.add_cascade(label="Edit", menu=self.edit_menu)
 
-        self.view_menu = tk.Menu(self.menu_bar, tearoff=0, bg='#f0f0f0', fg='black', bd=0)
+        self.view_menu = tk.Menu(self.menu_bar, tearoff=0, bg='#f0f0f0', fg='black', bd=0)  # Light theme for View menu
         self.view_menu.add_command(label="Zoom In", command=self.increase_font_size, accelerator="Ctrl + =")
         self.view_menu.add_command(label="Zoom Out", command=self.decrease_font_size, accelerator="Ctrl + -")
         self.view_menu.add_command(label="Reset Zoom", command=self.reset_font_size, accelerator="Ctrl + 0")
@@ -96,7 +111,7 @@ class Flashpad(tk.Tk):
         self.view_menu.add_command(label="Switch to Dark Theme", command=lambda: self.switch_theme("dark"))
         self.menu_bar.add_cascade(label="View", menu=self.view_menu)
 
-        self.help_menu = tk.Menu(self.menu_bar, tearoff=0, bg='#f0f0f0', fg='black', bd=0)
+        self.help_menu = tk.Menu(self.menu_bar, tearoff=0, bg='#f0f0f0', fg='black', bd=0)  # Light theme for Help menu
         self.help_menu.add_command(label="About", command=self.show_about)
         self.menu_bar.add_cascade(label="Help", menu=self.help_menu)
 
@@ -134,12 +149,12 @@ class Flashpad(tk.Tk):
                     file.write(self.text_widget.get(1.0, tk.END))
                     messagebox.showinfo("Save", f"File saved successfully: {self.current_file}")
         else:
-            file_path = filedialog.asksaveasfilename(defaultextension=".txt", filetypes=[("All Files", "*.*")])
+            file_path = filedialog.asksaveasfilename(defaultextension=".txt", filetypes=[("Text Files", "*.txt")])
             if file_path:
                 with open(file_path, "w") as file:
                     file.write(self.text_widget.get(1.0, tk.END))
                     self.current_file = file_path
-                    self.title(f"Flashpad - {file_path}")
+                    self.title(f"FlashPad - {file_path}")
                     messagebox.showinfo("Save", f"File saved successfully: {file_path}")
 
     def open_file(self, event=None):
@@ -162,12 +177,12 @@ class Flashpad(tk.Tk):
         self.title("Flashpad")
 
     def save_as_file(self, event=None):
-        file_path = filedialog.asksaveasfilename(defaultextension=".txt", filetypes=[("Text Files", "*.txt")])
+        file_path = filedialog.asksaveasfilename(defaultextension=".txt", filetypes=[("All Files", "*.*")])
         if file_path:
             with open(file_path, "w") as file:
                 file.write(self.text_widget.get(1.0, tk.END))
                 self.current_file = file_path
-                self.title(f"Flashpad - {file_path}")
+                self.title(f"FlashPad - {file_path}")
                 messagebox.showinfo("Save As", f"File saved successfully: {file_path}")
 
     def print_file(self, event=None):
