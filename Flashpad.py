@@ -112,6 +112,7 @@ class Flashpad(tk.Tk):
         self.menu_bar.add_cascade(label="View", menu=self.view_menu)
 
         self.help_menu = tk.Menu(self.menu_bar, tearoff=0, bg='#f0f0f0', fg='black', bd=0)  # Light theme for Help menu
+        self.help_menu.add_command(label="Version", command=self.show_version)
         self.help_menu.add_command(label="About", command=self.show_about)
         self.menu_bar.add_cascade(label="Help", menu=self.help_menu)
 
@@ -204,8 +205,11 @@ class Flashpad(tk.Tk):
         self.theme = theme
         self.apply_theme()
 
+    def show_version(self, event=None):
+        messagebox.showinfo("Version", "FlashPad - v1.0.1")
+
     def show_about(self, event=None):
-        messagebox.showinfo("About", "Flashpad - A simple text editor")
+        messagebox.showinfo("About", "FlashPad - A simple text editor")
 
     def on_text_change(self, event=None):
         line_count = self.text_widget.index("end-1c").split(".")[0]
