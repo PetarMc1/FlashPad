@@ -9,7 +9,7 @@ class Flashpad(tk.Tk):
     def __init__(self):
         super().__init__()
 
-        self.title("FlashpPad")
+        self.title("FlashPad")
         self.geometry("800x600")
 
         self.load_icon_from_url('https://cdn.458011.xyz/flashpad/icon.ico')
@@ -166,7 +166,7 @@ class Flashpad(tk.Tk):
                 self.text_widget.delete(1.0, tk.END)
                 self.text_widget.insert(tk.END, content)
                 self.current_file = file_path
-                self.title(f"Flashpad - {file_path}")
+                self.title(f"FlashPad - {file_path}")
 
     def new_file(self, event=None):
         if hasattr(self, 'current_file') and self.current_file:
@@ -175,7 +175,7 @@ class Flashpad(tk.Tk):
                 self.save_file()
         self.text_widget.delete(1.0, tk.END)
         self.current_file = None
-        self.title("Flashpad")
+        self.title("FlashPad")
 
     def save_as_file(self, event=None):
         file_path = filedialog.asksaveasfilename(defaultextension=".txt", filetypes=[("All Files", "*.*")])
@@ -206,7 +206,7 @@ class Flashpad(tk.Tk):
         self.apply_theme()
 
     def show_version(self, event=None):
-        messagebox.showinfo("Version", "FlashPad - v1.0.1")
+        messagebox.showinfo("Version", "v1.0.1")
 
     def show_about(self, event=None):
         messagebox.showinfo("About", "FlashPad - A simple text editor")
