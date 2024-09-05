@@ -19,6 +19,7 @@ class PrintDialog(tk.Toplevel):
         self.printer_name = None
         self.page_size = "A4"
         self.page_range = (1, 1)
+        self.total_pages = 1  # Placeholder for total pages
 
         # Printer Selection
         tk.Label(self, text="Select Printer:").pack(pady=5)
@@ -33,15 +34,16 @@ class PrintDialog(tk.Toplevel):
         page_size_menu.pack(pady=5)
 
         # Page Range Selection
-        tk.Label(self, text="Page Range (start-end):").pack(pady=5)
-        self.page_range_start = tk.Entry(self)
-        self.page_range_start.pack(pady=5)
-        self.page_range_end = tk.Entry(self)
-        self.page_range_end.pack(pady=5)
-        
+        tk.Label(self, text="Page Range (1 to total pages or 'all'):\nTotal Pages: 1").pack(pady=5)
+        self.page_range_entry = tk.Entry(self)
+        self.page_range_entry.pack(pady=5)
+
         # Buttons
         tk.Button(self, text="Print", command=self.print_job).pack(pady=10)
         tk.Button(self, text="Cancel", command=self.cancel).pack(pady=5)
+
+        # Update total pages
+        self.update_page_info()
 
     def populate_printer_list(self):
         printers = win32print.EnumPrinters(win32print.PRINTER_ENUM_LOCAL)
@@ -52,13 +54,29 @@ class PrintDialog(tk.Toplevel):
             self.printer_listbox.select_set(0)
             self.printer_name = printers[0][2]
 
+    def update_page_info(self):
+        # Simple estimation: assuming 1000 characters per page
+        char_per_page = 1000
+        total_chars = len(self.text_to_print)
+        self.total_pages = (total_chars // char_per_page) + 1
+        # Update label to show total pages
+        self.children["!label"].config(text=f"Page Range (1 to {self.total_pages} or 'all'):\nTotal Pages: {self.total_pages}")
+
     def print_job(self):
         try:
             selected_index = self.printer_listbox.curselection()
             if selected_index:
                 self.printer_name = self.printer_listbox.get(selected_index[0])
                 self.page_size = self.page_size_var.get()
-                self.page_range = (int(self.page_range_start.get() or 1), int(self.page_range_end.get() or 1))
+                page_range_text = self.page_range_entry.get().strip().lower()
+                if page_range_text == 'all':
+                    self.page_range = (1, self.total_pages)
+                else:
+                    start, end = map(int, page_range_text.split('-'))
+                    if 1 <= start <= end <= self.total_pages:
+                        self.page_range = (start, end)
+                    else:
+                        raise ValueError("Page range is out of bounds")
                 self.perform_print()
             else:
                 messagebox.showerror("Print", "No printer selected.")
@@ -77,9 +95,16 @@ class PrintDialog(tk.Toplevel):
                 hdc.StartDoc(doc_name)
                 hdc.StartPage()
                 text = self.text_to_print
-                # Here you should handle page size and range settings
-                # For now, we'll just print text at coordinates
-                hdc.TextOut(100, 100, text)  # Print text at coordinates
+                # Handle printing based on page size and range
+                # This is a placeholder; actual printing will vary
+                for page_num in range(self.page_range[0], self.page_range[1] + 1):
+                    start_index = (page_num - 1) * 1000
+                    end_index = min(start_index + 1000, len(text))
+                    page_text = text[start_index:end_index]
+                    hdc.TextOut(100, 100, page_text)  # Print text at coordinates
+                    if page_num < self.page_range[1]:
+                        hdc.EndPage()
+                        hdc.StartPage()
                 hdc.EndPage()
                 hdc.EndDoc()
                 hdc.DeleteDC()
@@ -191,10 +216,11 @@ class FlashPad(tk.Tk):
         self.file_menu.add_command(label="New", command=self.new_file, accelerator="Ctrl + N")
         self.file_menu.add_command(label="Open", command=self.open_file, accelerator="Ctrl + O")
         self.file_menu.add_command(label="Save", command=self.save_file, accelerator="Ctrl + S")
-        self.file_menu.add_command(label="Save As", command=self.save_as_file)
+        self.file_menu.add_command(label="Save As...", command=self.save_as_file)
         self.file_menu.add_separator()
         self.file_menu.add_command(label="Print", command=self.show_print_dialog, accelerator="Ctrl + P")
-        self.file_menu.add_command(label="Exit", command=self.quit)
+        self.file_menu.add_separator()
+        self.file_menu.add_command(label="Exit", command=self.quit, accelerator="Ctrl + Q")
         self.menu_bar.add_cascade(label="File", menu=self.file_menu)
 
         # Add Edit menu
