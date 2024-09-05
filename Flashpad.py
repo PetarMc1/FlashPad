@@ -256,7 +256,7 @@ class FlashPad(tk.Tk):
         messagebox.showinfo("About", "FlashPad\nA lightweight text editor with printing support.\nVersion 1.0")
 
     def show_version(self):
-        messagebox.showinfo("Version", "FlashPad version 1.0")
+        messagebox.showinfo("Version", "FlashPad v1.1.0-alpha.1")
 
     def switch_theme(self, theme):
         self.theme = theme
