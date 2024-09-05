@@ -14,7 +14,7 @@ FlashPad is a lightweight and customizable text editor designed to offer a clean
 
 To install FlashPad, follow these steps:
 
-1. **Download the Installer**: Obtain the latest version of the FlashPad installer from the [releases page](https://github.com/your-repository/releases).
+1. **Download the Installer**: Obtain the latest version of the FlashPad installer from the [releases page](https://github.com/PetarMc1/flashpad/releases).
 2. **Run the Installer**: Double-click the `FlashPadInstaller.exe` file to start the installation process.
 3. **Follow the Setup Wizard**: Follow the on-screen instructions to install FlashPad on your system.
 
@@ -40,12 +40,12 @@ To install FlashPad, follow these steps:
 Contributions are welcome! If you'd like to contribute to the development of FlashPad, follow these steps:
 
 1. **Fork the Repository**
-    Fork the [FlashPad repository](https://github.com/your-repository/flashpad) on GitHub to create your own copy.
+    Fork the [FlashPad repository](https://github.com/PetarMc1/flashpad) on GitHub to create your own copy.
 
 2. **Clone Your Fork**
     Clone your forked repository to your local machine.
         ```bash
-            git clone https://github.com/your-username/flashpad.git
+            git clone https://github.com/PetarMc1/flashpad.git
         ```
 
 3. **Set Up a Virtual Environment**:

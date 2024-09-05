@@ -1,11 +1,75 @@
 import tkinter as tk
+from tkinter import filedialog, messagebox
 import tkinter.font as tkfont
-from tkinter import filedialog, messagebox, simpledialog
-import requests
-from io import BytesIO
-from PIL import Image, ImageTk
 import win32print
 import win32ui
+from PIL import Image, ImageTk
+import requests
+from io import BytesIO
+
+class PrintDialog(tk.Toplevel):
+    def __init__(self, parent, text_to_print):
+        super().__init__(parent)
+        self.title("Print Setup")
+        self.geometry("300x200")
+        self.transient(parent)
+        self.grab_set()
+
+        self.text_to_print = text_to_print
+        self.printer_name = None
+
+        tk.Label(self, text="Select Printer:").pack(pady=5)
+        self.printer_listbox = tk.Listbox(self, width=40, height=5)
+        self.printer_listbox.pack(pady=5)
+        self.populate_printer_list()
+
+        tk.Button(self, text="Print", command=self.print_job).pack(pady=10)
+        tk.Button(self, text="Cancel", command=self.cancel).pack(pady=5)
+
+    def populate_printer_list(self):
+        printers = win32print.EnumPrinters(win32print.PRINTER_ENUM_LOCAL)
+        for printer in printers:
+            self.printer_listbox.insert(tk.END, printer[2])
+        
+        if printers:
+            self.printer_listbox.select_set(0)
+            self.printer_name = printers[0][2]
+
+    def print_job(self):
+        try:
+            selected_index = self.printer_listbox.curselection()
+            if selected_index:
+                self.printer_name = self.printer_listbox.get(selected_index[0])
+                self.perform_print()
+            else:
+                messagebox.showerror("Print", "No printer selected.")
+        except Exception as e:
+            messagebox.showerror("Print", f"An error occurred: {e}")
+        finally:
+            self.destroy()
+
+    def perform_print(self):
+        try:
+            hprinter = win32print.OpenPrinter(self.printer_name)
+            try:
+                doc_name = "FlashPad Document"
+                hdc = win32ui.CreateDC()
+                hdc.CreatePrinterDC(self.printer_name)
+                hdc.StartDoc(doc_name)
+                hdc.StartPage()
+                text = self.text_to_print
+                hdc.TextOut(100, 100, text)  # Print text at coordinates
+                hdc.EndPage()
+                hdc.EndDoc()
+                hdc.DeleteDC()
+                messagebox.showinfo("Print", "Print job sent successfully.")
+            finally:
+                win32print.ClosePrinter(hprinter)
+        except Exception as e:
+            messagebox.showerror("Print", f"An error occurred while printing: {e}")
+
+    def cancel(self):
+        self.destroy()
 
 class FlashPad(tk.Tk):
     def __init__(self):
@@ -52,7 +116,7 @@ class FlashPad(tk.Tk):
         # Create the text widget
         self.text_widget = tk.Text(self.text_frame, undo=True, wrap=tk.NONE, font=self.current_font,
                                    bg=self.text_bg, fg=self.text_fg, insertbackground=self.cursor_color,
-                                   yscrollcommand=self.sync_scroll)
+                                   yscrollcommand=self.sync_scroll_y)
         self.text_widget.pack(side=tk.RIGHT, fill=tk.BOTH, expand=True)
 
         # Create the line numbers widget
@@ -61,7 +125,7 @@ class FlashPad(tk.Tk):
         self.line_numbers.pack(side=tk.LEFT, fill=tk.Y)
 
         # Configure the scrollbar to scroll both text widgets
-        self.scrollbar_y.config(command=self.sync_scroll)
+        self.scrollbar_y.config(command=self.sync_scroll_y)
 
         # Bind events for updating line numbers
         self.text_widget.bind("<<Modified>>", self.on_text_change)
@@ -76,7 +140,7 @@ class FlashPad(tk.Tk):
         self.bind_all("<Control-s>", self.save_file)  # Ctrl + S
         self.bind_all("<Control-o>", self.open_file)  # Ctrl + O
         self.bind_all("<Control-n>", self.new_file)  # Ctrl + N
-        self.bind_all("<Control-p>", self.print_file)  # Ctrl + P
+        self.bind_all("<Control-p>", self.show_print_dialog)  # Ctrl + P
         self.bind_all("<Control-equal>", self.increase_font_size)  # Ctrl + =
         self.bind_all("<Control-minus>", self.decrease_font_size)  # Ctrl + -
         self.bind_all("<Control-0>", self.reset_font_size)  # Ctrl + 0 (reset to default)
@@ -108,7 +172,7 @@ class FlashPad(tk.Tk):
         self.file_menu.add_command(label="Save", command=self.save_file, accelerator="Ctrl + S")
         self.file_menu.add_command(label="Save As", command=self.save_as_file)
         self.file_menu.add_separator()
-        self.file_menu.add_command(label="Print", command=self.print_file, accelerator="Ctrl + P")
+        self.file_menu.add_command(label="Print", command=self.show_print_dialog, accelerator="Ctrl + P")
         self.file_menu.add_command(label="Exit", command=self.quit)
         self.menu_bar.add_cascade(label="File", menu=self.file_menu)
 
@@ -124,12 +188,11 @@ class FlashPad(tk.Tk):
 
         # Add View menu for zoom controls and theme switching
         self.view_menu = tk.Menu(self.menu_bar, tearoff=0, bg='#f0f0f0', fg='black', bd=0)  # Light theme for View menu
-        self.view_menu.add_command(label="Zoom In", command=self.increase_font_size, accelerator="Ctrl + =")
-        self.view_menu.add_command(label="Zoom Out", command=self.decrease_font_size, accelerator="Ctrl + -")
-        self.view_menu.add_command(label="Reset Zoom", command=self.reset_font_size, accelerator="Ctrl + 0")
+        self.view_menu.add_command(label="Increase Font Size", command=self.increase_font_size, accelerator="Ctrl + =")
+        self.view_menu.add_command(label="Decrease Font Size", command=self.decrease_font_size, accelerator="Ctrl + -")
+        self.view_menu.add_command(label="Reset Font Size", command=self.reset_font_size, accelerator="Ctrl + 0")
         self.view_menu.add_separator()
-        self.view_menu.add_command(label="Switch to Light Theme", command=lambda: self.switch_theme("light"))
-        self.view_menu.add_command(label="Switch to Dark Theme", command=lambda: self.switch_theme("dark"))
+        self.view_menu.add_command(label="Switch Theme", command=self.switch_theme, accelerator="Ctrl + T")
         self.menu_bar.add_cascade(label="View", menu=self.view_menu)
 
         # Add Help menu
@@ -139,56 +202,38 @@ class FlashPad(tk.Tk):
         self.menu_bar.add_cascade(label="Help", menu=self.help_menu)
 
     def finalize_setup(self):
-        # Initialize theme after all widgets are created
-        self.apply_theme()
+        # Ensure the first line is shown on start
+        self.text_widget.yview_moveto(0)
 
-    def apply_theme(self):
-        # Apply the current theme colors
-        if self.theme == "dark":
-            self.text_bg = '#1e1e1e'
-            self.text_fg = 'white'
-            self.cursor_color = 'white'
-            self.line_bg = '#2d2d2d'
-            self.line_fg = 'white'
-            self.scrollbar_bg = '#2d2d2d'
-            self.scrollbar_fg = 'white'
-        else:
-            self.text_bg = 'white'
-            self.text_fg = 'black'
-            self.cursor_color = 'black'
-            self.line_bg = '#f0f0f0'
-            self.line_fg = 'black'
-            self.scrollbar_bg = '#f0f0f0'
-            self.scrollbar_fg = 'black'
+    def show_print_dialog(self, event=None):
+        PrintDialog(self, self.text_widget.get(1.0, tk.END))
 
-        # Update widget colors
-        self.text_widget.config(bg=self.text_bg, fg=self.text_fg, insertbackground=self.cursor_color)
-        self.line_numbers.config(bg=self.line_bg, fg=self.line_fg)
-        self.scrollbar_y.config(bg=self.scrollbar_bg, troughcolor=self.scrollbar_bg)
-
-    def sync_scroll(self, *args):
-        # Sync scrolling between text widget and line numbers
+    def sync_scroll_y(self, *args):
         self.text_widget.yview(*args)
         self.line_numbers.yview(*args)
 
     def save_file(self, event=None):
-        if hasattr(self, 'current_file') and self.current_file:
-            response = messagebox.askyesno("Save", f"Do you want to save changes to {self.current_file}?")
-            if response:
-                with open(self.current_file, "w") as file:
-                    file.write(self.text_widget.get(1.0, tk.END))
-                    messagebox.showinfo("Save", f"File saved as {self.current_file}")
+        if self.current_file:
+            with open(self.current_file, "w") as file:
+                file.write(self.text_widget.get(1.0, tk.END))
         else:
             self.save_as_file()
 
     def open_file(self, event=None):
-        file_path = filedialog.askopenfilename(defaultextension=".txt", filetypes=[("Text Files", "*.txt")])
+        file_path = filedialog.askopenfilename(filetypes=[("Text Files", "*.txt")])
         if file_path:
             with open(file_path, "r") as file:
+                content = file.read()
                 self.text_widget.delete(1.0, tk.END)
-                self.text_widget.insert(tk.END, file.read())
+                self.text_widget.insert(tk.END, content)
                 self.current_file = file_path
-                self.title(f"FlashPad - {file_path}")
+
+    def save_as_file(self, event=None):
+        file_path = filedialog.asksaveasfilename(filetypes=[("Text Files", "*.txt")])
+        if file_path:
+            with open(file_path, "w") as file:
+                file.write(self.text_widget.get(1.0, tk.END))
+                self.current_file = file_path
 
     def new_file(self, event=None):
         response = messagebox.askyesno("New File", "Do you want to save changes to the current file?")
@@ -196,91 +241,45 @@ class FlashPad(tk.Tk):
             self.save_file()
         self.text_widget.delete(1.0, tk.END)
         self.current_file = None
-        self.title("FlashPad")
 
-    def save_as_file(self):
-        file_path = filedialog.asksaveasfilename(defaultextension=".txt", filetypes=[("Text Files", "*.txt")])
-        if file_path:
-            with open(file_path, "w") as file:
-                file.write(self.text_widget.get(1.0, tk.END))
-                self.current_file = file_path
-                self.title(f"FlashPad - {file_path}")
-
-    def print_file(self, event=None):
-        print_settings = tk.Toplevel(self)
-        print_settings.title("Print Settings")
-        print_settings.geometry("300x200")
-
-        def print_action():
-            printer_name = printer_var.get()
-            print("Selected Printer:", printer_name)
-
-            # Get the text to be printed
-            text_to_print = self.text_widget.get(1.0, tk.END)
-
-            try:
-                printer_info = win32print.GetPrinter(win32print.OpenPrinter(printer_name), 2)
-                hPrinter = win32ui.CreateDC()
-                hPrinter.CreatePrinterDC(printer_name)
-                hPrinter.StartDoc("FlashPad Print Job")
-                hPrinter.StartPage()
-                hPrinter.DrawText(text_to_print, (0, 0, 1000, 1000), win32ui.DT_LEFT)
-                hPrinter.EndPage()
-                hPrinter.EndDoc()
-                hPrinter.DeleteDC()
-                messagebox.showinfo("Print", "Document sent to printer.")
-            except Exception as e:
-                messagebox.showerror("Print Error", f"Failed to print document: {e}")
-
-            print_settings.destroy()
-
-        printers = win32print.EnumPrinters(win32print.PRINTER_ENUM_LOCAL)
-        printer_names = [printer[2] for printer in printers]
-
-        tk.Label(print_settings, text="Select Printer:").pack(pady=10)
-        printer_var = tk.StringVar(value=printer_names[0])
-        tk.OptionMenu(print_settings, printer_var, *printer_names).pack(pady=10)
-        tk.Button(print_settings, text="Print", command=print_action).pack(pady=20)
-
-    def switch_theme(self, theme):
-        self.theme = theme
+    def switch_theme(self, event=None):
+        self.theme = "light" if self.theme == "dark" else "dark"
         self.apply_theme()
 
     def increase_font_size(self, event=None):
         self.current_font_size += 2
         self.current_font.config(size=self.current_font_size)
+        self.text_widget.config(font=self.current_font)
+        self.line_numbers.config(font=self.current_font)
 
     def decrease_font_size(self, event=None):
-        if self.current_font_size > 8:  # Minimum font size to avoid too small text
+        if self.current_font_size > 6:
             self.current_font_size -= 2
             self.current_font.config(size=self.current_font_size)
+            self.text_widget.config(font=self.current_font)
+            self.line_numbers.config(font=self.current_font)
 
     def reset_font_size(self, event=None):
         self.current_font_size = 12
         self.current_font.config(size=self.current_font_size)
+        self.text_widget.config(font=self.current_font)
+        self.line_numbers.config(font=self.current_font)
 
     def on_text_change(self, event=None):
         self.update_line_numbers()
 
     def update_line_numbers(self):
-        line_numbers = ""
-        for i in range(1, int(self.text_widget.index('end').split('.')[0]) + 1):
-            line_numbers += f"{i}\n"
+        line_numbers = self.text_widget.index("end-1c").split(".")[0]
         self.line_numbers.config(state='normal')
         self.line_numbers.delete(1.0, tk.END)
-        self.line_numbers.insert(tk.END, line_numbers)
+        for i in range(1, int(line_numbers) + 1):
+            self.line_numbers.insert(tk.END, f"{i}\n")
         self.line_numbers.config(state='disabled')
 
     def mouse_scroll(self, event):
-        self.text_widget.yview_scroll(-1 * int((event.delta / 120)), "units")
-        self.line_numbers.yview_scroll(-1 * int((event.delta / 120)), "units")
+        self.text_widget.yview_scroll(int(-1 * (event.delta / 120)), "units")
+        self.line_numbers.yview_scroll(int(-1 * (event.delta / 120)), "units")
         return "break"
-
-    def show_about(self):
-        messagebox.showinfo("About", "FlashPad - A simple text editor.")
-
-    def show_version(self):
-        messagebox.showinfo("Version", "FlashPad v1.1.0-alpha.2")
 
     def undo(self, event=None):
         self.text_widget.edit_undo()
@@ -296,6 +295,12 @@ class FlashPad(tk.Tk):
 
     def paste(self, event=None):
         self.text_widget.event_generate("<<Paste>>")
+
+    def show_about(self):
+        messagebox.showinfo("About FlashPad", "FlashPad - A simple text editor.")
+
+    def show_version(self):
+        messagebox.showinfo("Version", "FlashPad v1.1.0-alpha.2")
 
 if __name__ == "__main__":
     app = FlashPad()
