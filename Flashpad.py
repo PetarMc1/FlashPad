@@ -133,6 +133,7 @@ class FlashPad(tk.Tk):
         # Add Help menu
         self.help_menu = tk.Menu(self.menu_bar, tearoff=0, bg='#f0f0f0', fg='black', bd=0)  # Light theme for Help menu
         self.help_menu.add_command(label="About", command=self.show_about)
+        self.help_menu.add_command(label="Version", command=self.show_version)
         self.menu_bar.add_cascade(label="Help", menu=self.help_menu)
 
     def finalize_setup(self):
@@ -231,6 +232,9 @@ class FlashPad(tk.Tk):
     def show_about(self, event=None):
         messagebox.showinfo("About", "FlashPad - A simple text editor")
 
+    def show_version(self, event=None):
+        messagebox.showinfo("Version", "FlashPad v1.0.2")
+
     def on_text_change(self, event=None):
         self.update_line_numbers()
         self.text_widget.edit_modified(False)  # Reset the modified flag
@@ -257,7 +261,6 @@ class FlashPad(tk.Tk):
         if event.delta:
             self.text_widget.yview_scroll(int(-1*(event.delta/120)), "units")
             self.line_numbers.yview_scroll(int(-1*(event.delta/120)), "units")
-
     def undo(self, event=None):
         self.text_widget.event_generate("<<Undo>>")
 
