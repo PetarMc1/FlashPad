@@ -166,121 +166,136 @@ class FlashPad(tk.Tk):
         self.line_numbers.config(bg=self.line_bg, fg=self.line_fg)
         self.scrollbar_y.config(bg=self.scrollbar_bg, troughcolor=self.scrollbar_bg)
 
+    def sync_scroll(self, *args):
+        # Sync scrolling between text widget and line numbers
+        self.text_widget.yview(*args)
+        self.line_numbers.yview(*args)
+
     def save_file(self, event=None):
         if hasattr(self, 'current_file') and self.current_file:
             response = messagebox.askyesno("Save", f"Do you want to save changes to {self.current_file}?")
             if response:
                 with open(self.current_file, "w") as file:
                     file.write(self.text_widget.get(1.0, tk.END))
-                    messagebox.showinfo("Save", f"File saved successfully to {self.current_file}")
+                    messagebox.showinfo("Save", f"File saved as {self.current_file}")
         else:
             self.save_as_file()
 
-    def save_as_file(self):
-        self.current_file = filedialog.asksaveasfilename(defaultextension=".txt", filetypes=[("Text files", "*.txt"), ("All files", "*.*")])
-        if self.current_file:
-            with open(self.current_file, "w") as file:
-                file.write(self.text_widget.get(1.0, tk.END))
-                messagebox.showinfo("Save", f"File saved successfully to {self.current_file}")
-
     def open_file(self, event=None):
-        self.current_file = filedialog.askopenfilename(defaultextension=".txt", filetypes=[("Text files", "*.txt"), ("All files", "*.*")])
-        if self.current_file:
-            with open(self.current_file, "r") as file:
+        file_path = filedialog.askopenfilename(defaultextension=".txt", filetypes=[("Text Files", "*.txt")])
+        if file_path:
+            with open(file_path, "r") as file:
                 self.text_widget.delete(1.0, tk.END)
                 self.text_widget.insert(tk.END, file.read())
-            messagebox.showinfo("Open", f"Opened file: {self.current_file}")
+                self.current_file = file_path
+                self.title(f"FlashPad - {file_path}")
 
     def new_file(self, event=None):
-        self.current_file = None
+        response = messagebox.askyesno("New File", "Do you want to save changes to the current file?")
+        if response:
+            self.save_file()
         self.text_widget.delete(1.0, tk.END)
+        self.current_file = None
+        self.title("FlashPad")
+
+    def save_as_file(self):
+        file_path = filedialog.asksaveasfilename(defaultextension=".txt", filetypes=[("Text Files", "*.txt")])
+        if file_path:
+            with open(file_path, "w") as file:
+                file.write(self.text_widget.get(1.0, tk.END))
+                self.current_file = file_path
+                self.title(f"FlashPad - {file_path}")
 
     def print_file(self, event=None):
-        # Show print dialog
-        copies = simpledialog.askinteger("Print Copies", "Number of copies:", initialvalue=1, minvalue=1)
-        page_range = simpledialog.askstring("Page Range", "Enter page range (e.g., 1-3,5):", initialvalue="All")
+        print_settings = tk.Toplevel(self)
+        print_settings.title("Print Settings")
+        print_settings.geometry("300x200")
 
-        if copies and page_range:
-            self.perform_print(copies, page_range)
+        def print_action():
+            printer_name = printer_var.get()
+            print("Selected Printer:", printer_name)
 
-    def perform_print(self, copies, page_range):
-        text_content = self.text_widget.get("1.0", tk.END).strip()
+            # Get the text to be printed
+            text_to_print = self.text_widget.get(1.0, tk.END)
 
-        printer_name = win32print.GetDefaultPrinter()
-        hprinter = win32print.OpenPrinter(printer_name)
-        hdc = win32ui.CreateDC()
-        hdc.CreatePrinterDC(printer_name)
+            try:
+                printer_info = win32print.GetPrinter(win32print.OpenPrinter(printer_name), 2)
+                hPrinter = win32ui.CreateDC()
+                hPrinter.CreatePrinterDC(printer_name)
+                hPrinter.StartDoc("FlashPad Print Job")
+                hPrinter.StartPage()
+                hPrinter.DrawText(text_to_print, (0, 0, 1000, 1000), win32ui.DT_LEFT)
+                hPrinter.EndPage()
+                hPrinter.EndDoc()
+                hPrinter.DeleteDC()
+                messagebox.showinfo("Print", "Document sent to printer.")
+            except Exception as e:
+                messagebox.showerror("Print Error", f"Failed to print document: {e}")
 
-        # Print Setup
-        doc_info = {'docname': self.current_file if self.current_file else 'Untitled.txt'}
-        win32print.StartDocPrinter(hprinter, 1, doc_info)
-        win32print.StartPagePrinter(hprinter)
+            print_settings.destroy()
 
-        # Simple print: Adjust font size, copies, page range can be customized more based on needs
-        hdc.TextOut(100, 100, text_content)
-        win32print.EndPagePrinter(hprinter)
-        win32print.EndDocPrinter(hprinter)
+        printers = win32print.EnumPrinters(win32print.PRINTER_ENUM_LOCAL)
+        printer_names = [printer[2] for printer in printers]
 
-        # Cleanup
-        win32print.ClosePrinter(hprinter)
-
-    # Helper functions for text editing
-    def cut(self):
-        self.text_widget.event_generate("<<Cut>>")
-
-    def copy(self):
-        self.text_widget.event_generate("<<Copy>>")
-
-    def paste(self):
-        self.text_widget.event_generate("<<Paste>>")
-
-    def undo(self):
-        self.text_widget.event_generate("<<Undo>>")
-
-    def redo(self):
-        self.text_widget.event_generate("<<Redo>>")
-
-    def increase_font_size(self, event=None):
-        self.current_font_size += 2
-        self.current_font.configure(size=self.current_font_size)
-
-    def decrease_font_size(self, event=None):
-        self.current_font_size -= 2
-        self.current_font.configure(size=self.current_font_size)
-
-    def reset_font_size(self, event=None):
-        self.current_font_size = 12
-        self.current_font.configure(size=self.current_font_size)
-
-    def show_about(self):
-        messagebox.showinfo("About", "FlashPad\nA lightweight text editor with printing support.")
-
-    def show_version(self):
-        messagebox.showinfo("Version", "FlashPad v1.1.0-alpha.1")
+        tk.Label(print_settings, text="Select Printer:").pack(pady=10)
+        printer_var = tk.StringVar(value=printer_names[0])
+        tk.OptionMenu(print_settings, printer_var, *printer_names).pack(pady=10)
+        tk.Button(print_settings, text="Print", command=print_action).pack(pady=20)
 
     def switch_theme(self, theme):
         self.theme = theme
         self.apply_theme()
 
+    def increase_font_size(self, event=None):
+        self.current_font_size += 2
+        self.current_font.config(size=self.current_font_size)
+
+    def decrease_font_size(self, event=None):
+        if self.current_font_size > 8:  # Minimum font size to avoid too small text
+            self.current_font_size -= 2
+            self.current_font.config(size=self.current_font_size)
+
+    def reset_font_size(self, event=None):
+        self.current_font_size = 12
+        self.current_font.config(size=self.current_font_size)
+
     def on_text_change(self, event=None):
         self.update_line_numbers()
-        self.text_widget.edit_modified(0)
 
     def update_line_numbers(self):
-        line_numbers = "\n".join(str(i + 1) for i in range(self.text_widget.index(tk.END).count("\n")[0]))
+        line_numbers = ""
+        for i in range(1, int(self.text_widget.index('end').split('.')[0]) + 1):
+            line_numbers += f"{i}\n"
         self.line_numbers.config(state='normal')
         self.line_numbers.delete(1.0, tk.END)
         self.line_numbers.insert(tk.END, line_numbers)
         self.line_numbers.config(state='disabled')
 
-    def sync_scroll(self, *args):
-        self.text_widget.yview(*args)
-        self.line_numbers.yview(*args)
-
     def mouse_scroll(self, event):
-        self.text_widget.yview("scroll", int(-event.delta / 120), "units")
-        self.line_numbers.yview("scroll", int(-event.delta / 120), "units")
+        self.text_widget.yview_scroll(-1 * int((event.delta / 120)), "units")
+        self.line_numbers.yview_scroll(-1 * int((event.delta / 120)), "units")
+        return "break"
 
+    def show_about(self):
+        messagebox.showinfo("About", "FlashPad - A simple text editor.")
+
+    def show_version(self):
+        messagebox.showinfo("Version", "v1.1.0-alpha.1")
+
+    def undo(self, event=None):
+        self.text_widget.edit_undo()
+
+    def redo(self, event=None):
+        self.text_widget.edit_redo()
+
+    def cut(self, event=None):
+        self.text_widget.event_generate("<<Cut>>")
+
+    def copy(self, event=None):
+        self.text_widget.event_generate("<<Copy>>")
+
+    def paste(self, event=None):
+        self.text_widget.event_generate("<<Paste>>")
 
 if __name__ == "__main__":
     app = FlashPad()
