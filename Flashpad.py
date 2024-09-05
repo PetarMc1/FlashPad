@@ -347,7 +347,7 @@ class FlashPad(tk.Tk):
         messagebox.showinfo("About FlashPad", "FlashPad - A simple text editor.")
 
     def show_version(self):
-        messagebox.showinfo("Version", "FlashPad v1.1.0-alpha.2")
+        messagebox.showinfo("Version", "FlashPad 1.1.0-alpha.3")
 
 if __name__ == "__main__":
     app = FlashPad()
