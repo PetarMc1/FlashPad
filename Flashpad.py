@@ -11,18 +11,35 @@ class PrintDialog(tk.Toplevel):
     def __init__(self, parent, text_to_print):
         super().__init__(parent)
         self.title("Print Setup")
-        self.geometry("300x200")
+        self.geometry("400x300")
         self.transient(parent)
         self.grab_set()
 
         self.text_to_print = text_to_print
         self.printer_name = None
+        self.page_size = "A4"
+        self.page_range = (1, 1)
 
+        # Printer Selection
         tk.Label(self, text="Select Printer:").pack(pady=5)
-        self.printer_listbox = tk.Listbox(self, width=40, height=5)
+        self.printer_listbox = tk.Listbox(self, width=50, height=5)
         self.printer_listbox.pack(pady=5)
         self.populate_printer_list()
 
+        # Page Size Selection
+        tk.Label(self, text="Page Size:").pack(pady=5)
+        self.page_size_var = tk.StringVar(value=self.page_size)
+        page_size_menu = tk.OptionMenu(self, self.page_size_var, "A4", "A3", "Letter", "Legal")
+        page_size_menu.pack(pady=5)
+
+        # Page Range Selection
+        tk.Label(self, text="Page Range (start-end):").pack(pady=5)
+        self.page_range_start = tk.Entry(self)
+        self.page_range_start.pack(pady=5)
+        self.page_range_end = tk.Entry(self)
+        self.page_range_end.pack(pady=5)
+        
+        # Buttons
         tk.Button(self, text="Print", command=self.print_job).pack(pady=10)
         tk.Button(self, text="Cancel", command=self.cancel).pack(pady=5)
 
@@ -40,6 +57,8 @@ class PrintDialog(tk.Toplevel):
             selected_index = self.printer_listbox.curselection()
             if selected_index:
                 self.printer_name = self.printer_listbox.get(selected_index[0])
+                self.page_size = self.page_size_var.get()
+                self.page_range = (int(self.page_range_start.get() or 1), int(self.page_range_end.get() or 1))
                 self.perform_print()
             else:
                 messagebox.showerror("Print", "No printer selected.")
@@ -58,6 +77,8 @@ class PrintDialog(tk.Toplevel):
                 hdc.StartDoc(doc_name)
                 hdc.StartPage()
                 text = self.text_to_print
+                # Here you should handle page size and range settings
+                # For now, we'll just print text at coordinates
                 hdc.TextOut(100, 100, text)  # Print text at coordinates
                 hdc.EndPage()
                 hdc.EndDoc()
@@ -186,7 +207,7 @@ class FlashPad(tk.Tk):
         self.edit_menu.add_command(label="Paste", command=self.paste, accelerator="Ctrl + V")
         self.menu_bar.add_cascade(label="Edit", menu=self.edit_menu)
 
-        # Add View menu for zoom controls and theme switching
+        # Add View menu
         self.view_menu = tk.Menu(self.menu_bar, tearoff=0, bg='#f0f0f0', fg='black', bd=0)  # Light theme for View menu
         self.view_menu.add_command(label="Increase Font Size", command=self.increase_font_size, accelerator="Ctrl + =")
         self.view_menu.add_command(label="Decrease Font Size", command=self.decrease_font_size, accelerator="Ctrl + -")
