@@ -21,7 +21,7 @@ To install FlashPad, follow these steps:
 ## Usage
 
 1. **Launching FlashPad**: After installation, you can launch FlashPad from the Start Menu or by double-clicking the desktop shortcut.
-2. **Opening Files**: You can open `.txt` files directly by dragging them into the FlashPad window or by using the "Open" option from the File menu.
+2. **Opening Files**: You can open `.txt` files directly <!--by dragging them into the FlashPad window or--> by using the "Open" option from the File menu.
 3. **Editing Text**: Use the text editor to type and modify your text. Font size and theme can be adjusted from the View menu.
 4. **Saving Files**: Save your changes using the "Save" option from the File menu. If you're saving for the first time, you'll be prompted to choose a file location.
 
