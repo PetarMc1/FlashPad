@@ -253,7 +253,7 @@ class FlashPad(tk.Tk):
         self.current_font.configure(size=self.current_font_size)
 
     def show_about(self):
-        messagebox.showinfo("About", "FlashPad\nA lightweight text editor with printing support.\nVersion 1.0")
+        messagebox.showinfo("About", "FlashPad\nA lightweight text editor with printing support.")
 
     def show_version(self):
         messagebox.showinfo("Version", "FlashPad v1.1.0-alpha.1")
