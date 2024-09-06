@@ -21,11 +21,13 @@ class PrintDialog(tk.Toplevel):
         self.page_range = (1, 1)
         self.total_pages = 1  # Placeholder for total pages
 
-        # Printer Selection
+        # Printer Selection (Dropdown)
         tk.Label(self, text="Select Printer:").pack(pady=5)
-        self.printer_listbox = tk.Listbox(self, width=50, height=5)
-        self.printer_listbox.pack(pady=5)
-        self.populate_printer_list()
+        self.printer_var = tk.StringVar()
+        self.populate_printer_dropdown()
+
+        self.printer_dropdown = tk.OptionMenu(self, self.printer_var, *self.printers)
+        self.printer_dropdown.pack(pady=5)
 
         # Page Size Selection
         tk.Label(self, text="Page Size:").pack(pady=5)
@@ -34,7 +36,7 @@ class PrintDialog(tk.Toplevel):
         page_size_menu.pack(pady=5)
 
         # Page Range Selection
-        tk.Label(self, text="Page Range (1 to total pages or 'all'):\nTotal Pages: 1").pack(pady=5)
+        tk.Label(self, text=f"Page Range (1 to total pages or 'all'):\nTotal Pages: {self.total_pages}").pack(pady=5)
         self.page_range_entry = tk.Entry(self)
         self.page_range_entry.pack(pady=5)
 
@@ -45,14 +47,11 @@ class PrintDialog(tk.Toplevel):
         # Update total pages
         self.update_page_info()
 
-    def populate_printer_list(self):
+    def populate_printer_dropdown(self):
         printers = win32print.EnumPrinters(win32print.PRINTER_ENUM_LOCAL)
-        for printer in printers:
-            self.printer_listbox.insert(tk.END, printer[2])
-        
-        if printers:
-            self.printer_listbox.select_set(0)
-            self.printer_name = printers[0][2]
+        self.printers = [printer[2] for printer in printers]
+        if self.printers:
+            self.printer_var.set(self.printers[0])  # Set the first printer as default
 
     def update_page_info(self):
         # Simple estimation: assuming 1000 characters per page
@@ -64,9 +63,8 @@ class PrintDialog(tk.Toplevel):
 
     def print_job(self):
         try:
-            selected_index = self.printer_listbox.curselection()
-            if selected_index:
-                self.printer_name = self.printer_listbox.get(selected_index[0])
+            if self.printer_var.get():
+                self.printer_name = self.printer_var.get()
                 self.page_size = self.page_size_var.get()
                 page_range_text = self.page_range_entry.get().strip().lower()
                 if page_range_text == 'all':
@@ -96,7 +94,6 @@ class PrintDialog(tk.Toplevel):
                 hdc.StartPage()
                 text = self.text_to_print
                 # Handle printing based on page size and range
-                # This is a placeholder; actual printing will vary
                 for page_num in range(self.page_range[0], self.page_range[1] + 1):
                     start_index = (page_num - 1) * 1000
                     end_index = min(start_index + 1000, len(text))
@@ -347,7 +344,7 @@ class FlashPad(tk.Tk):
         messagebox.showinfo("About FlashPad", "FlashPad - A simple text editor.")
 
     def show_version(self):
-        messagebox.showinfo("Version", "FlashPad 1.1.0-alpha.3")
+        messagebox.showinfo("Version", "FlashPad v1.1.0-alpha.2")
 
 if __name__ == "__main__":
     app = FlashPad()
