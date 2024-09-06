@@ -2,6 +2,14 @@
 
 FlashPad is a lightweight and customizable text editor designed to offer a clean and user-friendly interface for editing text files. **Note: FlashPad is currently available for Windows only.**
 
+
+
+DO NOT INSTALL THE EDITOR IN THE NORMAL INSTALL FOLDER. INSTALL IT IN A FOLDER YOU CAN ACCESS EASILY.
+
+
+
+
+
 ## Features
 
 - **Dark and Light Themes**: Easily switch between dark and light themes to suit your preference.
