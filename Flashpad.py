@@ -1,118 +1,12 @@
 import tkinter as tk
-from tkinter import filedialog, messagebox
-import tkinter.font as tkfont
+from tkinter import messagebox, filedialog
 import win32print
 import win32ui
-from PIL import Image, ImageTk
-import requests
+import win32con
 from io import BytesIO
-
-class PrintDialog(tk.Toplevel):
-    def __init__(self, parent, text_to_print):
-        super().__init__(parent)
-        self.title("Print Setup")
-        self.geometry("400x300")
-        self.transient(parent)
-        self.grab_set()
-
-        self.text_to_print = text_to_print
-        self.printer_name = None
-        self.page_size = "A4"
-        self.page_range = (1, 1)
-        self.total_pages = 1  # Placeholder for total pages
-
-        # Printer Selection (Dropdown)
-        tk.Label(self, text="Select Printer:").pack(pady=5)
-        self.printer_var = tk.StringVar()
-        self.populate_printer_dropdown()
-
-        self.printer_dropdown = tk.OptionMenu(self, self.printer_var, *self.printers)
-        self.printer_dropdown.pack(pady=5)
-
-        # Page Size Selection
-        tk.Label(self, text="Page Size:").pack(pady=5)
-        self.page_size_var = tk.StringVar(value=self.page_size)
-        page_size_menu = tk.OptionMenu(self, self.page_size_var, "A4", "A3", "Letter", "Legal")
-        page_size_menu.pack(pady=5)
-
-        # Page Range Selection
-        tk.Label(self, text=f"Page Range (1 to total pages or 'all'):\nTotal Pages: {self.total_pages}").pack(pady=5)
-        self.page_range_entry = tk.Entry(self)
-        self.page_range_entry.pack(pady=5)
-
-        # Buttons
-        tk.Button(self, text="Print", command=self.print_job).pack(pady=10)
-        tk.Button(self, text="Cancel", command=self.cancel).pack(pady=5)
-
-        # Update total pages
-        self.update_page_info()
-
-    def populate_printer_dropdown(self):
-        printers = win32print.EnumPrinters(win32print.PRINTER_ENUM_LOCAL)
-        self.printers = [printer[2] for printer in printers]
-        if self.printers:
-            self.printer_var.set(self.printers[0])  # Set the first printer as default
-
-    def update_page_info(self):
-        # Simple estimation: assuming 1000 characters per page
-        char_per_page = 1000
-        total_chars = len(self.text_to_print)
-        self.total_pages = (total_chars // char_per_page) + 1
-        # Update label to show total pages
-        self.children["!label"].config(text=f"Page Range (1 to {self.total_pages} or 'all'):\nTotal Pages: {self.total_pages}")
-
-    def print_job(self):
-        try:
-            if self.printer_var.get():
-                self.printer_name = self.printer_var.get()
-                self.page_size = self.page_size_var.get()
-                page_range_text = self.page_range_entry.get().strip().lower()
-                if page_range_text == 'all':
-                    self.page_range = (1, self.total_pages)
-                else:
-                    start, end = map(int, page_range_text.split('-'))
-                    if 1 <= start <= end <= self.total_pages:
-                        self.page_range = (start, end)
-                    else:
-                        raise ValueError("Page range is out of bounds")
-                self.perform_print()
-            else:
-                messagebox.showerror("Print", "No printer selected.")
-        except Exception as e:
-            messagebox.showerror("Print", f"An error occurred: {e}")
-        finally:
-            self.destroy()
-
-    def perform_print(self):
-        try:
-            hprinter = win32print.OpenPrinter(self.printer_name)
-            try:
-                doc_name = "FlashPad Document"
-                hdc = win32ui.CreateDC()
-                hdc.CreatePrinterDC(self.printer_name)
-                hdc.StartDoc(doc_name)
-                hdc.StartPage()
-                text = self.text_to_print
-                # Handle printing based on page size and range
-                for page_num in range(self.page_range[0], self.page_range[1] + 1):
-                    start_index = (page_num - 1) * 1000
-                    end_index = min(start_index + 1000, len(text))
-                    page_text = text[start_index:end_index]
-                    hdc.TextOut(100, 100, page_text)  # Print text at coordinates
-                    if page_num < self.page_range[1]:
-                        hdc.EndPage()
-                        hdc.StartPage()
-                hdc.EndPage()
-                hdc.EndDoc()
-                hdc.DeleteDC()
-                messagebox.showinfo("Print", "Print job sent successfully.")
-            finally:
-                win32print.ClosePrinter(hprinter)
-        except Exception as e:
-            messagebox.showerror("Print", f"An error occurred while printing: {e}")
-
-    def cancel(self):
-        self.destroy()
+import requests
+from PIL import Image, ImageTk, ImageWin
+import tkinter.font as tkfont
 
 class FlashPad(tk.Tk):
     def __init__(self):
@@ -183,10 +77,10 @@ class FlashPad(tk.Tk):
         self.bind_all("<Control-s>", self.save_file)  # Ctrl + S
         self.bind_all("<Control-o>", self.open_file)  # Ctrl + O
         self.bind_all("<Control-n>", self.new_file)  # Ctrl + N
-        self.bind_all("<Control-p>", self.show_print_dialog)  # Ctrl + P
         self.bind_all("<Control-equal>", self.increase_font_size)  # Ctrl + =
         self.bind_all("<Control-minus>", self.decrease_font_size)  # Ctrl + -
         self.bind_all("<Control-0>", self.reset_font_size)  # Ctrl + 0 (reset to default)
+        self.bind_all("<Control-p>", self.show_print_dialog)  # Ctrl + P (Print dialog)
 
         # Ensure the first line is shown on start
         self.text_widget.yview_moveto(0)
@@ -205,23 +99,22 @@ class FlashPad(tk.Tk):
 
     def create_menu_bar(self):
         # Create a menu bar and add it to the window
-        self.menu_bar = tk.Menu(self, bg='#f0f0f0', fg='black', bd=0)  # Light theme for menu bar
+        self.menu_bar = tk.Menu(self, bg='white', fg='black', bd=0)  # Light theme for menu bar
         self.configure(menu=self.menu_bar)
 
         # Add File menu
-        self.file_menu = tk.Menu(self.menu_bar, tearoff=0, bg='#f0f0f0', fg='black', bd=0)  # Light theme for File menu
+        self.file_menu = tk.Menu(self.menu_bar, tearoff=0, bg='white', fg='black', bd=0)  # Light theme for File menu
         self.file_menu.add_command(label="New", command=self.new_file, accelerator="Ctrl + N")
         self.file_menu.add_command(label="Open", command=self.open_file, accelerator="Ctrl + O")
         self.file_menu.add_command(label="Save", command=self.save_file, accelerator="Ctrl + S")
         self.file_menu.add_command(label="Save As...", command=self.save_as_file)
-        self.file_menu.add_separator()
-        self.file_menu.add_command(label="Print", command=self.show_print_dialog, accelerator="Ctrl + P")
+        self.file_menu.add_command(label="Print", command=self.show_print_dialog, accelerator="Ctrl + P")  # Print option
         self.file_menu.add_separator()
         self.file_menu.add_command(label="Exit", command=self.quit, accelerator="Ctrl + Q")
         self.menu_bar.add_cascade(label="File", menu=self.file_menu)
 
         # Add Edit menu
-        self.edit_menu = tk.Menu(self.menu_bar, tearoff=0, bg='#f0f0f0', fg='black', bd=0)  # Light theme for Edit menu
+        self.edit_menu = tk.Menu(self.menu_bar, tearoff=0, bg='white', fg='black', bd=0)  # Light theme for Edit menu
         self.edit_menu.add_command(label="Undo", command=self.undo, accelerator="Ctrl + Z")
         self.edit_menu.add_command(label="Redo", command=self.redo, accelerator="Ctrl + Y")
         self.edit_menu.add_separator()
@@ -231,7 +124,7 @@ class FlashPad(tk.Tk):
         self.menu_bar.add_cascade(label="Edit", menu=self.edit_menu)
 
         # Add View menu
-        self.view_menu = tk.Menu(self.menu_bar, tearoff=0, bg='#f0f0f0', fg='black', bd=0)  # Light theme for View menu
+        self.view_menu = tk.Menu(self.menu_bar, tearoff=0, bg='white', fg='black', bd=0)  # Light theme for View menu
         self.view_menu.add_command(label="Increase Font Size", command=self.increase_font_size, accelerator="Ctrl + =")
         self.view_menu.add_command(label="Decrease Font Size", command=self.decrease_font_size, accelerator="Ctrl + -")
         self.view_menu.add_command(label="Reset Font Size", command=self.reset_font_size, accelerator="Ctrl + 0")
@@ -240,7 +133,7 @@ class FlashPad(tk.Tk):
         self.menu_bar.add_cascade(label="View", menu=self.view_menu)
 
         # Add Help menu
-        self.help_menu = tk.Menu(self.menu_bar, tearoff=0, bg='#f0f0f0', fg='black', bd=0)  # Light theme for Help menu
+        self.help_menu = tk.Menu(self.menu_bar, tearoff=0, bg='white', fg='black', bd=0)  # Light theme for Help menu
         self.help_menu.add_command(label="About", command=self.show_about)
         self.help_menu.add_command(label="Version", command=self.show_version)
         self.menu_bar.add_cascade(label="Help", menu=self.help_menu)
@@ -249,81 +142,35 @@ class FlashPad(tk.Tk):
         # Ensure the first line is shown on start
         self.text_widget.yview_moveto(0)
 
-    def show_print_dialog(self, event=None):
-        PrintDialog(self, self.text_widget.get(1.0, tk.END))
+    def new_file(self, event=None):
+        if self.text_widget.get("1.0", tk.END).strip():
+            if messagebox.askyesno("Save Changes", "Do you want to save changes to the current file?"):
+                self.save_file()
+        self.text_widget.delete("1.0", tk.END)
+        self.current_file = None
 
-    def sync_scroll_y(self, *args):
-        self.text_widget.yview(*args)
-        self.line_numbers.yview(*args)
+    def open_file(self, event=None):
+        file_path = filedialog.askopenfilename(defaultextension=".txt", filetypes=[("Text Files", "*.txt"), ("All Files", "*.*")])
+        if file_path:
+            with open(file_path, "r") as file:
+                content = file.read()
+                self.text_widget.delete("1.0", tk.END)
+                self.text_widget.insert(tk.END, content)
+            self.current_file = file_path
 
     def save_file(self, event=None):
         if self.current_file:
             with open(self.current_file, "w") as file:
-                file.write(self.text_widget.get(1.0, tk.END))
+                file.write(self.text_widget.get("1.0", tk.END))
         else:
             self.save_as_file()
 
-    def open_file(self, event=None):
-        file_path = filedialog.askopenfilename(filetypes=[("Text Files", "*.txt")])
-        if file_path:
-            with open(file_path, "r") as file:
-                content = file.read()
-                self.text_widget.delete(1.0, tk.END)
-                self.text_widget.insert(tk.END, content)
-                self.current_file = file_path
-
     def save_as_file(self, event=None):
-        file_path = filedialog.asksaveasfilename(filetypes=[("Text Files", "*.txt")])
+        file_path = filedialog.asksaveasfilename(defaultextension=".txt", filetypes=[("Text Files", "*.txt"), ("All Files", "*.*")])
         if file_path:
             with open(file_path, "w") as file:
-                file.write(self.text_widget.get(1.0, tk.END))
-                self.current_file = file_path
-
-    def new_file(self, event=None):
-        response = messagebox.askyesno("New File", "Do you want to save changes to the current file?")
-        if response:
-            self.save_file()
-        self.text_widget.delete(1.0, tk.END)
-        self.current_file = None
-
-    def switch_theme(self, event=None):
-        self.theme = "light" if self.theme == "dark" else "dark"
-        self.apply_theme()
-
-    def increase_font_size(self, event=None):
-        self.current_font_size += 2
-        self.current_font.config(size=self.current_font_size)
-        self.text_widget.config(font=self.current_font)
-        self.line_numbers.config(font=self.current_font)
-
-    def decrease_font_size(self, event=None):
-        if self.current_font_size > 6:
-            self.current_font_size -= 2
-            self.current_font.config(size=self.current_font_size)
-            self.text_widget.config(font=self.current_font)
-            self.line_numbers.config(font=self.current_font)
-
-    def reset_font_size(self, event=None):
-        self.current_font_size = 12
-        self.current_font.config(size=self.current_font_size)
-        self.text_widget.config(font=self.current_font)
-        self.line_numbers.config(font=self.current_font)
-
-    def on_text_change(self, event=None):
-        self.update_line_numbers()
-
-    def update_line_numbers(self):
-        line_numbers = self.text_widget.index("end-1c").split(".")[0]
-        self.line_numbers.config(state='normal')
-        self.line_numbers.delete(1.0, tk.END)
-        for i in range(1, int(line_numbers) + 1):
-            self.line_numbers.insert(tk.END, f"{i}\n")
-        self.line_numbers.config(state='disabled')
-
-    def mouse_scroll(self, event):
-        self.text_widget.yview_scroll(int(-1 * (event.delta / 120)), "units")
-        self.line_numbers.yview_scroll(int(-1 * (event.delta / 120)), "units")
-        return "break"
+                file.write(self.text_widget.get("1.0", tk.END))
+            self.current_file = file_path
 
     def undo(self, event=None):
         self.text_widget.edit_undo()
@@ -340,11 +187,142 @@ class FlashPad(tk.Tk):
     def paste(self, event=None):
         self.text_widget.event_generate("<<Paste>>")
 
+    def increase_font_size(self, event=None):
+        self.current_font_size += 2
+        self.current_font.config(size=self.current_font_size)
+
+    def decrease_font_size(self, event=None):
+        if self.current_font_size > 2:
+            self.current_font_size -= 2
+            self.current_font.config(size=self.current_font_size)
+
+    def reset_font_size(self, event=None):
+        self.current_font_size = 12
+        self.current_font.config(size=self.current_font_size)
+
+    def switch_theme(self, event=None):
+        if self.theme == "dark":
+            self.text_bg = 'white'
+            self.text_fg = 'black'
+            self.cursor_color = 'black'
+            self.line_bg = '#f0f0f0'
+            self.line_fg = 'black'
+            self.scrollbar_bg = '#f0f0f0'
+            self.scrollbar_fg = 'black'
+            self.theme = "light"
+        else:
+            self.text_bg = '#1e1e1e'
+            self.text_fg = 'white'
+            self.cursor_color = 'white'
+            self.line_bg = '#2d2d2d'
+            self.line_fg = 'white'
+            self.scrollbar_bg = '#2d2d2d'
+            self.scrollbar_fg = 'white'
+            self.theme = "dark"
+        self.text_widget.config(bg=self.text_bg, fg=self.text_fg, insertbackground=self.cursor_color)
+        self.line_numbers.config(bg=self.line_bg, fg=self.line_fg)
+        self.scrollbar_y.config(bg=self.scrollbar_bg, troughcolor=self.scrollbar_bg, sliderrelief='flat', sliderbackground=self.scrollbar_fg)
+        self.text_widget.update_idletasks()
+
+    def show_print_dialog(self, event=None):
+        print_dialog = tk.Toplevel(self)
+        print_dialog.title("Print")
+        self.center_dialog(print_dialog)
+        print_dialog.configure(bg='white')
+
+        tk.Label(print_dialog, text="Printer:", bg='white').pack(pady=5)
+        self.printer_var = tk.StringVar(value=win32print.GetDefaultPrinter())
+        printers = [printer[2] for printer in win32print.EnumPrinters(win32print.PRINTER_ENUM_LOCAL)]
+        tk.OptionMenu(print_dialog, self.printer_var, *printers).pack(pady=5)
+
+        tk.Label(print_dialog, text="Number of Copies:", bg='white').pack(pady=5)
+        self.copies_var = tk.IntVar(value=1)
+        tk.Spinbox(print_dialog, from_=1, to=100, textvariable=self.copies_var, width=5).pack(pady=5)
+
+        tk.Label(print_dialog, text="Page Size:", bg='white').pack(pady=5)
+        self.page_size_var = tk.StringVar(value="A4")
+        tk.OptionMenu(print_dialog, self.page_size_var, "A4", "A3").pack(pady=5)
+
+        tk.Label(print_dialog, text="Print Range:", bg='white').pack(pady=5)
+        self.range_var = tk.StringVar(value="All")
+        range_menu = tk.OptionMenu(print_dialog, self.range_var, "All", "Custom")
+        range_menu.pack(pady=5)
+
+        self.custom_range_frame = tk.Frame(print_dialog, bg='white')
+        self.custom_range_frame.pack(pady=5)
+        tk.Label(self.custom_range_frame, text="From Page:", bg='white').pack(side=tk.LEFT, padx=5)
+        self.from_page_var = tk.IntVar(value=1)
+        self.from_page_entry = tk.Spinbox(self.custom_range_frame, from_=1, to=1000, textvariable=self.from_page_var, width=5)
+        self.from_page_entry.pack(side=tk.LEFT, padx=5)
+        tk.Label(self.custom_range_frame, text="To Page:", bg='white').pack(side=tk.LEFT, padx=5)
+        self.to_page_var = tk.IntVar(value=1)
+        self.to_page_entry = tk.Spinbox(self.custom_range_frame, from_=1, to=1000, textvariable=self.to_page_var, width=5)
+        self.to_page_entry.pack(side=tk.LEFT, padx=5)
+        self.custom_range_frame.pack_forget()
+
+        # Bind the range menu to update the frame visibility
+        range_menu.bind("<Configure>", self.update_range_frame)
+
+        button_frame = tk.Frame(print_dialog, bg='white')
+        button_frame.pack(pady=10)
+
+        tk.Button(button_frame, text="Print", command=self.print_text, relief=tk.RAISED, bg='lightgrey', fg='black', padx=10, pady=5).pack(side=tk.LEFT, padx=5)
+        tk.Button(button_frame, text="Cancel", command=print_dialog.destroy, relief=tk.RAISED, bg='lightgrey', fg='black', padx=10, pady=5).pack(side=tk.LEFT, padx=5)
+
+    def update_range_frame(self, event=None):
+        if self.range_var.get() == "Custom":
+            self.custom_range_frame.pack(pady=5)
+        else:
+            self.custom_range_frame.pack_forget()
+
+    def center_dialog(self, dialog):
+        dialog.update_idletasks()
+        width = dialog.winfo_width()
+        height = dialog.winfo_height()
+        screen_width = self.winfo_screenwidth()
+        screen_height = self.winfo_screenheight()
+        x = (screen_width - width) // 2
+        y = (screen_height - height) // 2
+        dialog.geometry(f'{width}x{height}+{x}+{y}')
+
+    def print_text(self):
+        # Implement the actual printing functionality here
+        print("Printing...")
+        # Access the selected printer, copies, page size, and print range
+        printer = self.printer_var.get()
+        copies = self.copies_var.get()
+        page_size = self.page_size_var.get()
+        print_range = self.range_var.get()
+        from_page = self.from_page_var.get()
+        to_page = self.to_page_var.get()
+        print(f"Printer: {printer}, Copies: {copies}, Page Size: {page_size}, Print Range: {print_range} (From: {from_page}, To: {to_page})")
+
+    def sync_scroll_y(self, *args):
+        self.text_widget.yview(*args)
+        self.line_numbers.yview(*args)
+
+    def on_text_change(self, *args):
+        self.update_line_numbers()
+        self.text_widget.edit_modified(False)
+
+    def update_line_numbers(self):
+        line_numbers = "\n".join(str(i) for i in range(1, int(self.text_widget.index('end-1c').split('.')[0]) + 1))
+        self.line_numbers.config(state='normal')
+        self.line_numbers.delete('1.0', tk.END)
+        self.line_numbers.insert(tk.END, line_numbers)
+        self.line_numbers.config(state='disabled')
+
+    def mouse_scroll(self, event):
+        if event.num == 5 or event.delta == -120:  # Scroll down
+            self.text_widget.yview_scroll(1, "units")
+        elif event.num == 4 or event.delta == 120:  # Scroll up
+            self.text_widget.yview_scroll(-1, "units")
+
     def show_about(self):
-        messagebox.showinfo("About FlashPad", "FlashPad - A simple text editor.")
+        messagebox.showinfo("About FlashPad", "FlashPad v1.0\nA simple text editor built.")
 
     def show_version(self):
-        messagebox.showinfo("Version", "FlashPad v1.1.0-alpha.2")
+        messagebox.showinfo("Version", "FlashPad v1.1.0-beta.1")
 
 if __name__ == "__main__":
     app = FlashPad()
